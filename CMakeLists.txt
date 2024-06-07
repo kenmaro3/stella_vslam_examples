@@ -3,6 +3,28 @@ project(stella_vslam_examples LANGUAGES CXX C)
 
 # ----- Find dependencies -----
 
+if(APPLE)
+    # On macOS, use Homebrew's OpenMP
+    execute_process(COMMAND brew --prefix libomp
+                    OUTPUT_VARIABLE OpenMP_HOME
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(EXISTS "${OpenMP_HOME}")
+        set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I${OpenMP_HOME}/include")
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I${OpenMP_HOME}/include")
+        set(OpenMP_C_LIB_NAMES "omp")
+        set(OpenMP_CXX_LIB_NAMES "omp")
+        set(OpenMP_omp_LIBRARY "${OpenMP_HOME}/lib/libomp.dylib")
+        link_directories("${OpenMP_HOME}/lib")
+    else()
+        message(FATAL_ERROR "OpenMP not found!")
+    endif()
+else()
+    find_package(OpenMP REQUIRED)
+    if(NOT OpenMP_FOUND)
+        message(FATAL_ERROR "OpenMP not found!")
+    endif()
+endif()
+
 find_package(stella_vslam REQUIRED)
 
 # filesystem
@@ -13,8 +35,13 @@ set(popl_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/3rd/popl/include)
 
 set(USE_STACK_TRACE_LOGGER OFF CACHE BOOL "Enable automatic stack trace logger of backward-cpp")
 if(USE_STACK_TRACE_LOGGER)
-    find_package(Backward REQUIRED)
-    message(STATUS "Stack trace logger: ENABLED")
+    find_package(Backward QUIET)
+    if(Backward_FOUND)
+        message(STATUS "Stack trace logger: ENABLED")
+    else()
+        message(WARNING "Backward not found! Stack trace logger: DISABLED")
+        set(USE_STACK_TRACE_LOGGER OFF)
+    endif()
 else()
     message(STATUS "Stack trace logger: DISABLED")
 endif()
@@ -33,12 +60,17 @@ endif()
 find_package(pangolin_viewer QUIET)
 if(pangolin_viewer_FOUND)
     message(STATUS "Viewer for examples: PangolinViewer")
+else()
+    message(STATUS "NOT FOUND PangolinViewer")
+
 endif()
 find_package(socket_publisher QUIET)
 if(socket_publisher_FOUND)
     message(STATUS "Viewer for examples: SocketPublisher")
+else()
+    message(STATUS "NOT FOUND SocketPublisher")
 endif()
-find_package(iridescence_viewer)
+find_package(iridescence_viewer QUIET)
 if(iridescence_viewer_FOUND)
     message(STATUS "Viewer for examples: IridescenceViewer")
 endif()
@@ -109,10 +141,11 @@ foreach(EXECUTABLE_TARGET IN LISTS EXECUTABLE_TARGETS)
         target_link_libraries(${EXECUTABLE_TARGET} PRIVATE ${GPERFTOOLS_LIBRARIES})
     endif()
 
-    # Link stella_vslam
+    # Link stella_vslam and OpenMP
     target_link_libraries(${EXECUTABLE_TARGET}
                           PRIVATE
                           stella_vslam::stella_vslam
+                          ${OpenMP_omp_LIBRARY}
                           opencv_imgcodecs
                           opencv_videoio)
 
@@ -123,3 +156,4 @@ foreach(EXECUTABLE_TARGET IN LISTS EXECUTABLE_TARGETS)
                                $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/3rd/filesystem/include>
                                $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/3rd/spdlog/include>)
 endforeach()
+
