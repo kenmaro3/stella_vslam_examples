@@ -73,6 +73,8 @@ endif()
 find_package(iridescence_viewer QUIET)
 if(iridescence_viewer_FOUND)
     message(STATUS "Viewer for examples: IridescenceViewer")
+else()
+    message(STATUS "NOT FOUND iridescence_viewer")
 endif()
 
 # ----- Build example executables -----
